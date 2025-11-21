@@ -4,18 +4,43 @@
 
 import copy
 import inspect
+import sys
+
+# Load ruamel or pyyaml as needed
+try:
+    import ruamel.yaml
+    from ruamel.yaml.comments import CommentedMap
+    yaml = ruamel.yaml.YAML(typ='rt')
+    #yaml.default_flow_style = True
+    useruamel=True
+    loaderkwargs = {}
+    dumperkwargs = {}
+    Loader=yaml.load
+except:
+    import yaml as yaml
+    useruamel=False
+    loaderkwargs = {}
+    dumperkwargs = {'default_flow_style':False }
+    Loader=yaml.safe_load
 
 testsubdict = [
     {'key':'name',  'required':True,  'type':str,   'default':'mysubdict', 'validate':None,
      'help':'An arbitrary name',},
+    {'key':'mylist', 'required':False,  'type':[],   'default':[1,2,3], 'validate':None,
+     'help':'An arbitrary list',},
 ]
 
+testheader="""
+This is a test of the inputdicthelper
+These are the inputs
+
+"""
 testmaininput = [
     {'key':'name',    'required':True,  'type':None, 'default':'myname', 'validate':None,
      'help':'An arbitrary name',},
     {'key':'intval',  'required':True, 'type':int, 'default':0, 'validate':(lambda x: (x>=0)),
      'help':'An arbitrary integer',},
-    {'key':'floatval','required':False, 'type':(int, float), 'default':0, 'validate':(lambda x, y: (x+y['intval']>=200)),
+    {'key':'floatval','required':False, 'type':(int, float), 'default':0.123, 'validate':(lambda x, y: (x+y['intval']>=200)),
      'help':'An arbitrary float',},
     {'key':'boolval','required':False, 'type':bool, 'default':True, 'validate':None,
      'help':'An arbitrary boolean',},
@@ -23,8 +48,16 @@ testmaininput = [
      'help':'A required subdictionary',},
 ]
 
-def template2dict(template, includeoptional=True):
-    outdict = {}
+def template2dict(template, includeoptional=True, ruamel=useruamel,
+                  startcomments='', extendedhelp=True):
+    """
+    Converts the template definitions to a python dictionary
+    """
+    if ruamel:
+        outdict = CommentedMap()
+        if startcomments: outdict.yaml_set_start_comment(startcomments)
+    else:
+        outdict = {}
     for d in template:
         key = d['key']
         val = d['default']
@@ -33,6 +66,12 @@ def template2dict(template, includeoptional=True):
                 outdict[key] = template2dict(val)
             else:
                 outdict[key] = val
+        if ruamel and len(d['help'])>0:
+            helpstr = d['help']
+            default = d['default']
+            default = {} if isinstance(d['type'], dict) else default 
+            if extendedhelp: helpstr += " [Required: "+repr(d['required'])+", default: "+repr(default)+"]"
+            outdict.yaml_add_eol_comment(helpstr, key, column=40)
     return outdict
     
 
@@ -88,6 +127,15 @@ class inputdict:
 
     def getdefaultdict(self, includeoptional=True):
         return template2dict(self.template, includeoptional=includeoptional)
+
+    def dumpyaml(self, outputfile, includeoptional=True):
+        """
+        Write the template to a yaml file
+        """
+        yamldict = template2dict(self.template, includeoptional=includeoptional,
+                                 startcomments=self.globalhelp)
+        yaml.dump(yamldict, outputfile, **dumperkwargs)
+        return
     
     def ingestdict(self, inputdict, validate=True, checkunused=True):
         outdict = mergedict(inputdict, self.template, validate=validate, checkunused=checkunused)
@@ -103,7 +151,7 @@ class inputdict:
 #
 # ========================================================================
 if __name__ == "__main__":
-    inputs = inputdict(testmaininput)
+    inputs = inputdict(testmaininput, globalhelp=testheader)
     #inputs.printtemplate()
 
     inputdict = {
@@ -113,6 +161,8 @@ if __name__ == "__main__":
         'subdict':{'name':'subdictname'},
         'extrakey':'blah',
     }
-    outdict = inputs.ingestdict(inputdict, checkunused=False)
-    print(inputs.getdefaultdict())
+    outdict = inputs.ingestdict(inputdict, checkunused=True)
+    inputs.dumpyaml(sys.stdout)
+    print()
+    #print(inputs.getdefaultdict())
     print(outdict)
