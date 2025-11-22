@@ -161,7 +161,7 @@ if __name__ == "__main__":
         'subdict':{'name':'subdictname'},
         'extrakey':'blah',
     }
-    outdict = inputs.ingestdict(inputdict, checkunused=True)
+    outdict = inputs.ingestdict(inputdict, checkunused=False)
     inputs.dumpyaml(sys.stdout)
     print()
     #print(inputs.getdefaultdict())
