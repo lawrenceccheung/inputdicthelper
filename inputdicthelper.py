@@ -5,6 +5,9 @@
 import copy
 import inspect
 import sys
+import io
+import configparser
+import ast
 
 # Load ruamel or pyyaml as needed
 try:
@@ -26,7 +29,7 @@ except:
 testsubdict = [
     {'key':'name',  'required':True,  'type':str,   'default':'mysubdict', 'validate':None,
      'help':'An arbitrary name',},
-    {'key':'mylist', 'required':False,  'type':[],   'default':[1,2,3], 'validate':None,
+    {'key':'mylist', 'required':False,  'type':[],   'default':[1,2,3,5], 'validate':None,
      'help':'An arbitrary list',},
 ]
 
@@ -47,6 +50,25 @@ testmaininput = [
     {'key':'subdict', 'required':True,  'type':{}, 'default':testsubdict, 'validate':None,
      'help':'A required subdictionary',},
 ]
+
+testiniinput = [
+    {'key':'default', 'required':True,  'type':{}, 'default':testmaininput[:-1], 'validate':None,
+     'help':'Default section',},
+    {'key':'subdict', 'required':True,  'type':{}, 'default':testsubdict, 'validate':None,
+     'help':'A required subdictionary',},
+    ]
+
+def convertstring(s, typedef):
+    """
+    Convert a string to a python type
+    """
+    if not isinstance(s, str):
+        # Is is already some non-string python type, so return it
+        return s
+    if (typedef is None) or (typedef==str) or isinstance(typedef, dict):
+        return s.strip()
+    seval = ast.literal_eval(s)
+    return seval
 
 def template2dict(template, includeoptional=True, ruamel=useruamel,
                   startcomments='', extendedhelp=True):
@@ -116,6 +138,56 @@ def mergedict(indict, dictdefs, validate=True, checkunused=True):
         raise ValueError('These keys were not used: ',allkeys)
     return outdict
 
+def mergeconfig(inconfig, dictdefs, validate=True, checkunused=True):
+    """
+    """
+    outdict = {}
+    allkeys = list(inconfig.keys())
+    for d in dictdefs:
+        key = d['key']
+        if (d['required']) and (key not in inconfig):
+            # Stop, we have a problem
+            raise ValueError(f'Problem, missing {key} in dictionary')
+        # Set the value in outdict
+        if not isinstance(d['type'], dict):
+            outdict[key] = inconfig[key] if key in inconfig else d['default']
+            outdict[key] = convertstring(outdict[key], d['type'])
+        else:
+            outdict[key] = mergeconfig(inconfig[key], d['default']) if key in inconfig else template2dict(d['default'])
+        # Validate entry (just this entry)
+        if validate:
+            # Check the value type
+            if (d['type'] is not None) and (d['type']) and (not isinstance(outdict[key], d['type'])):
+                raise ValueError(f'Type of {key} not correct')
+            # Check the validate function
+            if (d['validate'] is not None) and (len(inspect.signature(d['validate']).parameters)==1):
+                if not d['validate'](outdict[key]):
+                    raise ValueError(f'Validation failed for {key}')
+    # Do a global validation
+    if validate:
+        for d in dictdefs:
+            key = d['key']
+            if (d['validate'] is not None) and (len(inspect.signature(d['validate']).parameters)==2):
+                if not d['validate'](outdict[key], outdict):
+                    raise ValueError(f'Global validation failed for {key}')
+    return outdict
+
+def getfilehandle(f, fromstring):
+    """
+    returns a file handle to f, depending on whether:
+    1. f is already a file handle
+    2. f is a string containing the data (fromstring=True)
+    3. f is a filename
+    """
+    if isinstance(f, io.IOBase):
+        # f is already a file handle
+        return f
+    if fromstring:
+        # Convert f from string to a file handle
+        return io.StringIO(f)
+    return open(f, 'r')
+
+
 class inputdict:
     """
     An input dictionary helper class
@@ -136,14 +208,48 @@ class inputdict:
                                  startcomments=self.globalhelp)
         yaml.dump(yamldict, outputfile, **dumperkwargs)
         return
+
+    def dumpini(self, outputfile, includeoptional=True, defautsec='DEFAULT'):
+        """
+        Write the template to an ini file
+        """
+        yamldict = template2dict(self.template, includeoptional=includeoptional,
+                                 startcomments=self.globalhelp)
+        config = configparser.ConfigParser()
+        #config.read_dict(yamldict)
+        config[defautsec] = {}
+        for key, values in yamldict.items():
+            if isinstance(values, dict):
+                config[key] = values
+            else:
+                config[defautsec][key] = repr(values)
+        config.write(outputfile)
+        return
     
     def ingestdict(self, inputdict, validate=True, checkunused=True):
         outdict = mergedict(inputdict, self.template, validate=validate, checkunused=checkunused)
         return outdict
 
-    def printtemplate(self):
-        for x in self.template:
-            print(x)
+    def ingestyaml(self, yamlfile, fromstring=False, validate=True, checkunused=True):
+        """
+        Read the dictionary from a yaml file
+        """
+        f = getfilehandle(yamlfile, fromstring)
+        inputdict = Loader(f, **loaderkwargs)
+        f.close()
+        outdict = mergedict(inputdict, self.template, validate=validate, checkunused=checkunused)
+        return outdict
+
+    def ingestini(self, inifile, fromstring=False, validate=True, checkunused=True):
+        """
+        Read the dictionary from an ini file
+        """
+        f = getfilehandle(inifile, fromstring)
+        config = configparser.ConfigParser()
+        config.read_file(f)
+        outdict = mergeconfig(config, self.template, validate=validate, checkunused=checkunused)
+        return outdict
+
 
 # ========================================================================
 #
@@ -152,6 +258,7 @@ class inputdict:
 # ========================================================================
 if __name__ == "__main__":
     inputs = inputdict(testmaininput, globalhelp=testheader)
+    inputsini = inputdict(testiniinput) 
     #inputs.printtemplate()
 
     inputdict = {
@@ -164,5 +271,33 @@ if __name__ == "__main__":
     outdict = inputs.ingestdict(inputdict, checkunused=False)
     inputs.dumpyaml(sys.stdout)
     print()
+    inputsini.dumpini(sys.stdout)
+    print()
     #print(inputs.getdefaultdict())
+    print(outdict)
+    print()
+    inputstr="""
+name: myname                            # An arbitrary name [Required: True, default: 'myname']
+intval: 0                               # An arbitrary integer [Required: True, default: 0]
+floatval: 300.123                         # An arbitrary float [Required: False, default: 0.123]
+boolval: true                           # An arbitrary boolean [Required: False, default: True]
+subdict:                                # A required subdictionary [Required: True, default: {}]
+  name: mysubdict                       # An arbitrary name [Required: True, default: 'mysubdict']
+  mylist: [1,2,3]                               # An arbitrary list [Required: False, default: [1, 2, 3]]
+"""
+    outdict = inputs.ingestyaml(inputstr, fromstring=True, checkunused=False)
+    print(outdict)
+    inputstr="""
+[default]
+name = myname
+intval = 0
+floatval = 200.123
+boolval = True
+
+[subdict]
+name = mysubdict
+mylist = [1, 2, 3]
+"""
+
+    outdict = inputsini.ingestini(inputstr, fromstring=True, checkunused=False)
     print(outdict)
