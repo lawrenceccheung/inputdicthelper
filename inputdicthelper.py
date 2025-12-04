@@ -41,7 +41,7 @@ These are the inputs
 testmaininput = [
     {'key':'name',    'required':True,  'type':None, 'default':'myname', 'validate':None,
      'help':'An arbitrary name',},
-    {'key':'intval',  'required':True, 'type':int, 'default':0, 'validate':(lambda x: (x>=0)),
+    {'key':'intval',  'required':True, 'type':int, 'default':0, 'validate':(lambda x: (x>=0, 'intval must be >= 0.')),
      'help':'An arbitrary integer',},
     {'key':'floatval','required':False, 'type':(int, float), 'default':0.123, 'validate':(lambda x, y: (x+y['intval']>=200)),
      'help':'An arbitrary float',},
@@ -119,8 +119,9 @@ def mergedict(indict, dictdefs, validate=True, checkunused=True):
                 raise ValueError(f'Type of {key} not correct')
             # Check the validate function
             if (d['validate'] is not None) and (len(inspect.signature(d['validate']).parameters)==1):
-                if not d['validate'](outdict[key]):
-                    raise ValueError(f'Validation failed for {key}')
+                valid, vmesg = splitvalidateout(d['validate'](outdict[key]))
+                if not valid:
+                    raise ValueError(f'Validation failed for {key}: '+vmesg)
         # Remove the key from allkeys
         if key in allkeys: allkeys.remove(key)
 
@@ -129,14 +130,24 @@ def mergedict(indict, dictdefs, validate=True, checkunused=True):
         for d in dictdefs:
             key = d['key']
             if (d['validate'] is not None) and (len(inspect.signature(d['validate']).parameters)==2):
-                if not d['validate'](outdict[key], outdict):
-                    raise ValueError(f'Global validation failed for {key}')
+                valid, vmesg = splitvalidateout(d['validate'](outdict[key], outdict))
+                if not valid:
+                    raise ValueError(f'Global validation failed for {key}: '+vmesg)
                 
 
     # Check for unused keys
     if checkunused and (len(allkeys)>0):
         raise ValueError('These keys were not used: ',allkeys)
     return outdict
+
+def splitvalidateout(vout):
+    """
+    Splits the output of validate functions
+    """
+    if isinstance(vout, tuple):
+        return vout[0], vout[1]
+    else:
+        return vout, ''
 
 def mergeconfig(inconfig, dictdefs, validate=True, checkunused=True):
     """
@@ -161,15 +172,17 @@ def mergeconfig(inconfig, dictdefs, validate=True, checkunused=True):
                 raise ValueError(f'Type of {key} not correct')
             # Check the validate function
             if (d['validate'] is not None) and (len(inspect.signature(d['validate']).parameters)==1):
-                if not d['validate'](outdict[key]):
-                    raise ValueError(f'Validation failed for {key}')
+                valid, vmesg = splitvalidateout(d['validate'](outdict[key]))
+                if not valid:
+                    raise ValueError(f'Validation failed for {key}: '+vmesg)
     # Do a global validation
     if validate:
         for d in dictdefs:
             key = d['key']
             if (d['validate'] is not None) and (len(inspect.signature(d['validate']).parameters)==2):
-                if not d['validate'](outdict[key], outdict):
-                    raise ValueError(f'Global validation failed for {key}')
+                valid, vmesg = splitvalidateout(d['validate'](outdict[key], outdict))
+                if not valid:
+                    raise ValueError(f'Global validation failed for {key}: '+vmesg)
     return outdict
 
 def getfilehandle(f, fromstring):
