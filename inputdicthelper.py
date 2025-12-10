@@ -2,6 +2,9 @@
 #
 # A helper library to get inputs from a dictionary
 
+# Note: Can download this file from
+#   https://raw.githubusercontent.com/lawrenceccheung/inputdicthelper/refs/heads/main/inputdicthelper.py
+
 import copy
 import inspect
 import sys
@@ -199,6 +202,36 @@ def getfilehandle(f, fromstring):
         # Convert f from string to a file handle
         return io.StringIO(f)
     return open(f, 'r')
+
+def loadyamlstring(s, replacekey='__replacestrings__'):
+    """
+    Load a yaml input from  a string and handle any string replacements
+    """
+    f = io.StringIO(s) 
+    yamldicttemp = Loader(f, **loaderkwargs)
+    # Do any direct string replacements
+    if replacekey in yamldicttemp:
+        replacedict = yamldicttemp[replacekey]
+        sclean   = s.replace(replacekey+':', '#replacestrings')
+        for k, g in replacedict.items():
+            sclean = sclean.replace(k+':', '#REPLACED')
+        newstr   = stringReplaceDict(sclean, replacedict)
+        f2       = io.StringIO(newstr)
+        yamldict1 = Loader(f2, **loaderkwargs)
+    else:
+        newstr   = s
+        yamldict1 = yamldicttemp
+    return yamldict1
+
+
+def loadyamlfile(f):
+    """
+    Load a yaml file, handle any string replacements, and return the dictionary
+    """
+    with open(f, 'r') as file:
+        s= file.read()
+        return loadyamlstring(s)
+    return
 
 
 class inputdict:
