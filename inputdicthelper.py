@@ -73,6 +73,16 @@ def convertstring(s, typedef):
     seval = ast.literal_eval(s)
     return seval
 
+def stringReplaceDict(s, dreplace):
+    """
+    Replace strings in s with items in dreplace
+    """
+    outstr = str(s)
+    for k, g in dreplace.items():
+        s = '' if g is None else str(g)
+        outstr=outstr.replace(k, s)
+    return outstr
+
 def template2dict(template, includeoptional=True, ruamel=useruamel,
                   startcomments='', extendedhelp=True):
     """
