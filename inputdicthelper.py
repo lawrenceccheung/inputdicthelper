@@ -83,6 +83,15 @@ def stringReplaceDict(s, dreplace):
         outstr=outstr.replace(k, s)
     return outstr
 
+def checkInList(l, x):
+    """
+    Check that element x is in l
+    """
+    if x in l:
+        return True
+    else:
+        return (False, repr(x)+' is not one of '+repr(l))
+
 def template2dict(template, includeoptional=True, ruamel=useruamel,
                   startcomments='', extendedhelp=True):
     """
@@ -256,13 +265,18 @@ class inputdict:
     def getdefaultdict(self, includeoptional=True):
         return template2dict(self.template, includeoptional=includeoptional)
 
-    def dumpyaml(self, outputfile, includeoptional=True):
+    def dumpyaml(self, outputfile, includeoptional=True, toplevel=None):
         """
         Write the template to a yaml file
         """
         yamldict = template2dict(self.template, includeoptional=includeoptional,
                                  startcomments=self.globalhelp)
-        yaml.dump(yamldict, outputfile, **dumperkwargs)
+        if toplevel is None:
+            outputyaml = yamldict
+        else:
+            outputyaml = {}
+            outputyaml[toplevel] = yamldict
+        yaml.dump(outputyaml, outputfile, **dumperkwargs)
         return
 
     def dumpini(self, outputfile, includeoptional=True, defautsec='DEFAULT'):
