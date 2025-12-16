@@ -123,6 +123,8 @@ def mergedict(indict, dictdefs, validate=True, checkunused=True):
     """
     """
     outdict = {}
+    if indict is None:
+        indict = {}
     allkeys = list(indict.keys())
     for d in dictdefs:
         key = d['key']
@@ -133,7 +135,7 @@ def mergedict(indict, dictdefs, validate=True, checkunused=True):
         if not isinstance(d['type'], dict):
             outdict[key] = indict[key] if key in indict else d['default']
         else:
-            outdict[key] = mergedict(indict[key], d['default']) if key in indict else template2dict(d['default'])
+            outdict[key] = mergedict(indict[key], d['default'], checkunused=checkunused) if key in indict else template2dict(d['default'])
         # Validate entry (just this entry)
         if validate:
             # Check the value type
