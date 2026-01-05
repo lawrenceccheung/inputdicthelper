@@ -8,6 +8,7 @@
 import copy
 import inspect
 import sys
+import os
 import io
 import configparser
 import ast
@@ -82,6 +83,16 @@ def stringReplaceDict(s, dreplace):
         s = '' if g is None else str(g)
         outstr=outstr.replace(k, s)
     return outstr
+
+def checkPathExists(f):
+    """
+    Check that the file or directory f exists
+    """
+    if os.path.exists(f):
+        return True
+    else:
+        return (False, f'The path {f} does not exist')
+
 
 def checkInList(l, x):
     """
