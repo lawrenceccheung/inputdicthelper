@@ -30,37 +30,6 @@ except:
     dumperkwargs = {'default_flow_style':False }
     Loader=yaml.safe_load
 
-testsubdict = [
-    {'key':'name',  'required':True,  'type':str,   'default':'mysubdict', 'validate':None,
-     'help':'An arbitrary name',},
-    {'key':'mylist', 'required':False,  'type':[],   'default':[1,2,3,5], 'validate':None,
-     'help':'An arbitrary list',},
-]
-
-testheader="""
-This is a test of the inputdicthelper
-These are the inputs
-
-"""
-testmaininput = [
-    {'key':'name',    'required':True,  'type':None, 'default':'myname', 'validate':None,
-     'help':'An arbitrary name',},
-    {'key':'intval',  'required':True, 'type':int, 'default':0, 'validate':(lambda x: (x>=0, 'intval must be >= 0.')),
-     'help':'An arbitrary integer',},
-    {'key':'floatval','required':False, 'type':(int, float), 'default':0.123, 'validate':(lambda x, y: (x+y['intval']>=200)),
-     'help':'An arbitrary float',},
-    {'key':'boolval','required':False, 'type':bool, 'default':True, 'validate':None,
-     'help':'An arbitrary boolean',},
-    {'key':'subdict', 'required':True,  'type':{}, 'default':testsubdict, 'validate':None,
-     'help':'A required subdictionary',},
-]
-
-testiniinput = [
-    {'key':'default', 'required':True,  'type':{}, 'default':testmaininput[:-1], 'validate':None,
-     'help':'Default section',},
-    {'key':'subdict', 'required':True,  'type':{}, 'default':testsubdict, 'validate':None,
-     'help':'A required subdictionary',},
-    ]
 
 def convertstring(s, typedef):
     """
@@ -334,53 +303,3 @@ class inputdict:
         return outdict
 
 
-# ========================================================================
-#
-# Main
-#
-# ========================================================================
-if __name__ == "__main__":
-    inputs = inputdict(testmaininput, globalhelp=testheader)
-    inputsini = inputdict(testiniinput) 
-    #inputs.printtemplate()
-
-    inputdict = {
-        'name':'junk',
-        'intval':111,
-        'floatval':100,
-        'subdict':{'name':'subdictname'},
-        'extrakey':'blah',
-    }
-    outdict = inputs.ingestdict(inputdict, checkunused=False)
-    inputs.dumpyaml(sys.stdout)
-    print()
-    inputsini.dumpini(sys.stdout)
-    print()
-    #print(inputs.getdefaultdict())
-    print(outdict)
-    print()
-    inputstr="""
-name: myname                            # An arbitrary name [Required: True, default: 'myname']
-intval: 0                               # An arbitrary integer [Required: True, default: 0]
-floatval: 300.123                         # An arbitrary float [Required: False, default: 0.123]
-boolval: true                           # An arbitrary boolean [Required: False, default: True]
-subdict:                                # A required subdictionary [Required: True, default: {}]
-  name: mysubdict                       # An arbitrary name [Required: True, default: 'mysubdict']
-  mylist: [1,2,3]                               # An arbitrary list [Required: False, default: [1, 2, 3]]
-"""
-    outdict = inputs.ingestyaml(inputstr, fromstring=True, checkunused=False)
-    print(outdict)
-    inputstr="""
-[default]
-name = myname
-intval = 0
-floatval = 200.123
-boolval = True
-
-[subdict]
-name = mysubdict
-mylist = [1, 2, 3]
-"""
-
-    outdict = inputsini.ingestini(inputstr, fromstring=True, checkunused=False)
-    print(outdict)
