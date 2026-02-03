@@ -121,8 +121,12 @@ def mergedict(indict, dictdefs, validate=True, checkunused=True):
             # Check the value type
             if (d['type'] is not None) and (d['type']) and (not isinstance(outdict[key], d['type'])):
                 raise ValueError(f'Type of {key} not correct')
+            # Check for validating/merging a list
+            if isinstance(outdict[key], list) and isinstance(d['validate'], list):
+                for i, x in enumerate(outdict[key]):
+                    outdict[key][i] = mergedict(x, d['validate'], checkunused=False)
             # Check the validate function
-            if (d['validate'] is not None) and (len(inspect.signature(d['validate']).parameters)==1):
+            if (d['validate'] is not None) and (not isinstance(d['validate'], list)) and (len(inspect.signature(d['validate']).parameters)==1):
                 valid, vmesg = splitvalidateout(d['validate'](outdict[key]))
                 if not valid:
                     raise ValueError(f'Validation failed for {key}: '+vmesg)
@@ -133,7 +137,7 @@ def mergedict(indict, dictdefs, validate=True, checkunused=True):
     if validate:
         for d in dictdefs:
             key = d['key']
-            if (d['validate'] is not None) and (len(inspect.signature(d['validate']).parameters)==2):
+            if (d['validate'] is not None) and (not isinstance(d['validate'], list)) and (len(inspect.signature(d['validate']).parameters)==2):
                 valid, vmesg = splitvalidateout(d['validate'](outdict[key], outdict))
                 if not valid:
                     raise ValueError(f'Global validation failed for {key}: '+vmesg)
