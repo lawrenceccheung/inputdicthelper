@@ -88,6 +88,8 @@ def template2dict(template, includeoptional=True, ruamel=useruamel,
         if d['required'] or includeoptional:
             if isinstance(d['type'], dict):
                 outdict[key] = template2dict(val)
+            elif isinstance(d['type'], list) and (d['validate']):
+                outdict[key] = template2dict(d['validate']) 
             else:
                 outdict[key] = val
         if ruamel and len(d['help'])>0:
