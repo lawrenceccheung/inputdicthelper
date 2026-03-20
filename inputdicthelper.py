@@ -19,6 +19,14 @@ try:
     from ruamel.yaml.comments import CommentedMap
     yaml = ruamel.yaml.YAML(typ='rt')
     #yaml.default_flow_style = True
+    
+    # Disable aliases/anchors by patching the representer
+    yaml.representer.ignore_aliases = lambda *data: True
+
+    def represent_none(self, data):
+        return self.represent_scalar('tag:yaml.org,2002:null', '')
+    yaml.representer.add_representer(type(None), represent_none)
+    
     useruamel=True
     loaderkwargs = {}
     dumperkwargs = {}
